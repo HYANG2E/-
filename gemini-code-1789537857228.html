@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쿠리만주 다라케 쿠지 시뮬레이터</title>
+    <!-- HTML을 이미지로 변환하기 위한 html2canvas 라이브러리 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #fcf9f2;          /* 전체 배경: 은은한 아이보리 베이지 */
+            --container-bg: #ffffff;      /* 컨테이너 카드 배경: 화이트 */
+            --sub-bg: #f4ecdf;            /* 내부 박스 배경: 부드러운 샌드 베이지 */
+            --border-color: #e6d7c3;      /* 테두리 색상 */
+            --accent: #d97706;            /* 강조 색상 (따뜻한 호박색) */
+            --accent-hover: #b45309;      /* 강조 호버 색상 */
+            --text: #4b382a;              /* 메인 텍스트: 진한 브라운 */
+            --text-sub: #8c7355;          /* 서브 텍스트: 차분한 브라운 그레이 */
+        }
+        body {
+            font-family: 'Apple SD Gothic Neo', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 650px;
+            background: var(--container-bg);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(140, 115, 85, 0.1);
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+        h1, h2, h3 { text-align: center; margin-top: 0; color: var(--text); }
+        
+        /* 상단 타이틀 (클릭 히든 기능용) */
+        .main-title {
+            cursor: pointer;
+            user-select: none;
+            transition: 0.2s;
+        }
+        .main-title:hover {
+            opacity: 0.8;
+        }
+        
+        /* 상단 통계 바 */
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--sub-bg);
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border: 1px solid var(--border-color);
+            color: var(--text);
+        }
+        .stats-bar span { color: var(--accent); }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: var(--sub-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-sub);
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        
+        /* 뽑기 화면 스타일 */
+        .gacha-box {
+            text-align: center;
+            padding: 30px 20px;
+            background: var(--sub-bg);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 2px dashed var(--border-color);
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .action-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border: none;
+            color: white;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(217, 119, 6, 0.2);
+            transition: 0.2s;
+        }
+        .action-btn:hover { transform: scale(1.03); background: linear-gradient(135deg, #fbbf24, #b45309); }
+        
+        /* 캡처 영역 스타일 */
+        #capture-area {
+            background: var(--container-bg);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        /* 결과창 스타일 */
+        .result-container {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .result-card {
+            background: var(--sub-bg);
+            padding: 10px;
+            border-radius: 8px;
+            width: 110px;
+            text-align: center;
+            animation: popIn 0.3s ease-out;
+            border: 1px solid var(--border-color);
+            border-top: 4px solid var(--accent);
+            box-sizing: border-box;
+        }
+        .result-img {
+            width: 100%;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #e2d4c0;
+            margin-bottom: 6px;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 공유 및 저장 버튼 스타일 */
+        .share-btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .share-btn {
+            flex: 1;
+            background: #60a5fa;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .share-btn:hover { background: #3b82f6; }
+        .share-btn.success { background: #10b981; }
+
+        /* 친구에게 결과+링크 공유 버튼 스타일 */
+        .friend-share-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #fb7185, #f43f5e);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 4px 10px rgba(244, 63, 94, 0.2);
+            transition: 0.2s;
+        }
+        .friend-share-btn:hover { background: linear-gradient(135deg, #fda4af, #e11d48); transform: scale(1.01); }
+        .friend-share-btn.success { background: #10b981; }
+
+        /* 🎬 뽑기 연출 동영상 모달 스타일 */
+        #video-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .video-wrapper {
+            width: 90%;
+            max-width: 450px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            border: 2px solid var(--accent);
+            text-align: center;
+        }
+        .video-wrapper video {
+            width: 100%;
+            display: block;
+            max-height: 70vh;
+        }
+        .skip-btn {
+            margin-top: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 10px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .skip-btn:hover { background: rgba(255, 255, 255, 0.4); }
+
+        /* 관리자 설정 스타일 */
+        .prize-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+            background: var(--sub-bg);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .prize-row input {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text);
+            padding: 8px;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .prize-name { flex: 2; }
+        .prize-prob { flex: 1; }
+        .prize-img { flex: 3; }
+        
+        .save-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.2s;
+        }
+        .save-btn:hover { background: #059669; }
+
+        .reset-all-btn {
+            background: #f87171;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: 0.2s;
+        }
+        .reset-all-btn:hover { background: #ef4444; }
+
+        .clear-btn {
+            background: #f87171;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: 0.2s;
+        }
+        .clear-btn:hover { background: #ef4444; }
+
+        .info-text { font-size: 13px; color: var(--text-sub); text-align: center; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<!-- 🎬 뽑기 연출 동영상 모달창 -->
+<div id="video-modal">
+    <div class="video-wrapper">
+        <video id="guji-video" playsinline>
+            <source src="video.mp4" type="video/mp4">
+            동영상을 재생할 수 없는 브라우저입니다.
+        </video>
+    </div>
+    <button class="skip-btn" onclick="closeVideoAndShowResult()">영상 스킵하기 ⏩</button>
+</div>
+
+<div class="container">
+    <h1 class="main-title" onclick="tryOpenAdmin()" title="연속 클릭 시 관리자 메뉴가 열립니다">🌰 쿠리만주 다라케 쿠지 시뮬레이터</h1>
+    
+    <div class="stats-bar">
+        <div>총 추첨 횟수: <span id="total-draw-display">0</span>회</div>
+        <button class="clear-btn" style="margin-top:0; padding:6px 12px; font-size:12px; width:auto; background:#e11d48;" onclick="resetTotalDrawsAndInventory()">총 횟수 초기화</button>
+    </div>
+
+    <!-- 💌 친구에게 당첨 결과+링크 공유하기 버튼 -->
+    <button class="friend-share-btn" id="friend-share-btn" onclick="shareResultWithFriend()">🎁 내 방금 뽑은 당첨 결과 & 링크 공유하기</button>
+
+    <div class="tabs" id="tab-container" style="margin-top: 15px;">
+        <button class="tab-btn active" onclick="switchTab('play')">뽑기 하러가기</button>
+        <button class="tab-btn" onclick="switchTab('inventory')">📦 당첨 보관함</button>
+    </div>
+
+    <!-- [1] 뽑기 화면 -->
+    <div id="play-view" class="view-section active">
+        <div class="gacha-box">
+            <h2>운을 시험해보세요!</h2>
+            <p class="info-text">천장 없는 독립 시행 확률 가챠 시스템</p>
+            <div class="btn-group">
+                <button class="action-btn" onclick="startDraw(1)">1회 뽑기</button>
+                <button class="action-btn" onclick="startDraw(3)">3회 뽑기</button>
+                <button class="action-btn" onclick="startDraw(5)">5회 뽑기</button>
+                <button class="action-btn" onclick="startDraw(10)">10회 연속 뽑기</button>
+            </div>
+        </div>
+        
+        <div id="capture-area">
+            <h3>이번 뽑기 결과</h3>
+            <div id="shared-notice" style="display:none; background:#fee2e2; color:#b91c1c; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:12px; font-size:14px;"></div>
+            <div id="result-area" class="result-container">
+                <p style="color: var(--text-sub); font-size: 14px;">아직 뽑은 상품이 없습니다.</p>
+            </div>
+        </div>
+
+        <div id="action-buttons" style="display: none;" class="share-btn-group">
+            <button class="share-btn" onclick="downloadResultImage()">📷 이미지로 저장</button>
+            <button class="share-btn" id="copy-text-btn" onclick="copyResultText()">📋 결과 텍스트 복사</button>
+        </div>
+    </div>
+
+    <!-- [2] 당첨 보관함 -->
+    <div id="inventory-view" class="view-section">
+        <h2>내 당첨 보관함 (뽑기 기록)</h2>
+        <p class="info-text">지금까지 획득한 모든 상품 기록이 확률과 함께 저장됩니다.</p>
+        <div id="inventory-area" class="result-container">
+            <p style="color: var(--text-sub); font-size: 14px;">보관함이 비어 있습니다.</p>
+        </div>
+        <button class="clear-btn" onclick="resetTotalDrawsAndInventory()">총 추첨 횟수 및 보관함 비우기</button>
+    </div>
+
+    <!-- [3] 설정 화면 (관리자 전용) -->
+    <div id="admin-view" class="view-section">
+        <h2>쿠지 확률 및 상품 설정 (관리자 전용)</h2>
+        <p class="info-text">상품 이름, 확률(%), 이미지 주소를 입력하세요.</p>
+        <div id="prize-settings-container"></div>
+        <button class="save-btn" onclick="saveSettings()">설정 저장하기</button>
+        <button class="reset-all-btn" onclick="resetSimulator()">모든 데이터 초기화 (처음부터 다시하기)</button>
+        <button class="tab-btn" style="width:100%; margin-top:15px; background:#64748b; color:white;" onclick="logoutAdmin()">관리자 모드 잠그기 (나가기)</button>
+    </div>
+</div>
+
+<script>
+    const defaultPrizes = [
+        { name: "A상", prob: 1, img: "https://via.placeholder.com/150/d97706/ffffff?text=A-Prize" },
+        { name: "B상", prob: 2, img: "https://via.placeholder.com/150/3b82f6/ffffff?text=B-Prize" },
+        { name: "C-1상", prob: 3, img: "https://via.placeholder.com/150/10b981/ffffff?text=C-1" },
+        { name: "C-2상", prob: 3, img: "https://via.placeholder.com/150/10b981/ffffff?text=C-2" },
+        { name: "D상", prob: 7, img: "https://via.placeholder.com/150/8b5cf6/ffffff?text=D-Prize" },
+        { name: "E-1상", prob: 14, img: "https://via.placeholder.com/150/8c7355/ffffff?text=E-1" },
+        { name: "E-2상", prob: 14, img: "https://via.placeholder.com/150/8c7355/ffffff?text=E-2" },
+        { name: "E-3상", prob: 14, img: "https://via.placeholder.com/150/8c7355/ffffff?text=E-3" },
+        { name: "E-4상", prob: 14, img: "https://via.placeholder.com/150/8c7355/ffffff?text=E-4" },
+        { name: "E-5상", prob: 14, img: "https://via.placeholder.com/150/8c7355/ffffff?text=E-5" },
+        { name: "E-6상", prob: 14, img: "https://via.placeholder.com/150/8c7355/ffffff?text=E-6" }
+    ];
+
+    let prizes = JSON.parse(localStorage.getItem('kuji_prizes_img_v10')) || defaultPrizes;
+    let inventory = JSON.parse(localStorage.getItem('kuji_inventory_v10')) || [];
+    let totalDraws = parseInt(localStorage.getItem('kuji_total_draws_v10')) || 0;
+    let lastResults = [];
+    let pendingCount = 0;
+
+    let isAdmin = sessionStorage.getItem('kuji_is_admin') === 'true';
+
+    updateStatsDisplay();
+    checkAdminUI();
+    checkSharedResultParam();
+
+    let clickCount = 0;
+    let clickTimer = null;
+
+    function tryOpenAdmin() {
+        if (isAdmin) {
+            switchTab('admin');
+            return;
+        }
+
+        clickCount++;
+        clearTimeout(clickTimer);
+        
+        if (clickCount >= 5) {
+            clickCount = 0;
+            let password = prompt("관리자 비밀번호를 입력하세요:");
+            if (password === "1234") {
+                isAdmin = true;
+                sessionStorage.setItem('kuji_is_admin', 'true');
+                checkAdminUI();
+                switchTab('admin');
+                alert("관리자 모드가 활성화되었습니다!");
+            } else if (password !== null) {
+                alert("비밀번호가 틀렸습니다.");
+            }
+        } else {
+            clickTimer = setTimeout(() => {
+                clickCount = 0;
+            }, 1000);
+        }
+    }
+
+    function checkAdminUI() {
+        let tabContainer = document.getElementById('tab-container');
+        let adminTab = document.getElementById('admin-tab-btn');
+
+        if (isAdmin) {
+            if (!document.getElementById('admin-tab-btn')) {
+                tabContainer.innerHTML += `<button class="tab-btn" id="admin-tab-btn" onclick="switchTab('admin')">⚙️ 설정</button>`;
+            }
+        } else {
+            if (adminTab) adminTab.remove();
+        }
+    }
+
+    function logoutAdmin() {
+        isAdmin = false;
+        sessionStorage.removeItem('kuji_is_admin');
+        checkAdminUI();
+        switchTab('play');
+        alert("관리자 모드가 잠겼습니다.");
+    }
+
+    function updateStatsDisplay() {
+        document.getElementById('total-draw-display').innerText = totalDraws;
+    }
+
+    function switchTab(tabName) {
+        if (tabName === 'admin' && !isAdmin) return;
+
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        if(tabName === 'play') {
+            document.getElementById('play-view').classList.add('active');
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        } else if(tabName === 'inventory') {
+            document.getElementById('inventory-view').classList.add('active');
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            renderInventory();
+        } else if(tabName === 'admin' && isAdmin) {
+            document.getElementById('admin-view').classList.add('active');
+            let adminBtn = document.getElementById('admin-tab-btn');
+            if(adminBtn) adminBtn.classList.add('active');
+            renderAdminSettings();
+        }
+    }
+
+    function renderAdminSettings() {
+        const container = document.getElementById('prize-settings-container');
+        container.innerHTML = '';
+        
+        let totalProb = prizes.reduce((sum, p) => sum + Number(p.prob), 0);
+        
+        prizes.forEach((prize, index) => {
+            container.innerHTML += `
+                <div class="prize-row">
+                    <input type="text" class="prize-name" id="name-${index}" value="${prize.name}" placeholder="상품명">
+                    <input type="number" class="prize-prob" id="prob-${index}" value="${prize.prob}" step="0.1" min="0" max="100" placeholder="%">
+                    <input type="text" class="prize-img" id="img-${index}" value="${prize.img}" placeholder="이미지 URL 주소">
+                </div>
+            `;
+        });
+        
+        container.innerHTML += `<p id="total-prob-text" style="text-align:right; font-weight:bold; color:${totalProb === 100 ? '#10b981' : '#ef4444'}">현재 확률 총합: ${totalProb}%</p>`;
+    }
+
+    function saveSettings() {
+        let newPrizes = [];
+        let totalProb = 0;
+
+        for (let i = 0; i < prizes.length; i++) {
+            let name = document.getElementById(`name-${i}`).value;
+            let prob = parseFloat(document.getElementById(`prob-${i}`).value);
+            let img = document.getElementById(`img-${i}`).value;
+            
+            if(!name || isNaN(prob)) {
+                alert("상품 이름과 확률은 필수로 입력해주세요.");
+                return;
+            }
+            newPrizes.push({ name, prob, img });
+            totalProb += prob;
+        }
+
+        prizes = newPrizes;
+        localStorage.setItem('kuji_prizes_img_v10', JSON.stringify(prizes));
+        alert(`설정이 저장되었습니다! (확률 총합: ${totalProb}%)`);
+        switchTab('play');
+    }
+
+    function startDraw(count) {
+        pendingCount = count;
+        
+        let modal = document.getElementById('video-modal');
+        let video = document.getElementById('guji-video');
+        
+        modal.style.display = 'flex';
+        video.currentTime = 0;
+        
+        video.play().catch(error => {
+            console.log("자동 재생이 차단되었거나 영상 파일을 불러오지 못했습니다:", error);
+        });
+
+        video.onended = function() {
+            closeVideoAndShowResult();
+        };
+    }
+
+    function closeVideoAndShowResult() {
+        let modal = document.getElementById('video-modal');
+        let video = document.getElementById('guji-video');
+        
+        video.pause();
+        modal.style.display = 'none';
+
+        executeDraw(pendingCount);
+    }
+
+    function executeDraw(count) {
+        let resultArea = document.getElementById('result-area');
+        resultArea.innerHTML = '';
+        document.getElementById('shared-notice').style.display = 'none';
+        document.getElementById('action-buttons').style.display = 'none';
+
+        let results = [];
+        for (let c = 0; c < count; c++) {
+            let randomNum = Math.random() * 100;
+            let cumulative = 0;
+            let selectedPrize = prizes[prizes.length - 1];
+
+            for (let prize of prizes) {
+                cumulative += prize.prob;
+                if (randomNum <= cumulative) {
+                    selectedPrize = prize;
+                    break;
+                }
+            }
+            results.push(selectedPrize);
+        }
+
+        lastResults = results;
+        inventory.unshift(...results);
+        totalDraws += count;
+
+        localStorage.setItem('kuji_inventory_v10', JSON.stringify(inventory));
+        localStorage.setItem('kuji_total_draws_v10', totalDraws);
+        
+        updateStatsDisplay();
+
+        results.forEach((prize, idx) => {
+            setTimeout(() => {
+                resultArea.innerHTML += `
+                    <div class="result-card">
+                        <img src="${prize.img || 'https://via.placeholder.com/150'}" class="result-img" alt="${prize.name}">
+                        <div style="font-weight: bold; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text);">${prize.name}</div>
+                        <div style="font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: bold;">(${prize.prob}%)</div>
+                    </div>
+                `;
+                if(idx === results.length - 1) {
+                    document.getElementById('action-buttons').style.display = 'flex';
+                }
+            }, idx * 80);
+        });
+    }
+
+    function shareResultWithFriend() {
+        if(lastResults.length === 0) {
+            alert("먼저 뽑기를 진행한 후 결과 공유 버튼을 눌러주세요!");
+            return;
+        }
+
+        let names = lastResults.map(r => r.name).join(",");
+        let encodedData = encodeURIComponent(names);
+        let baseUrl = window.location.href.split('?')[0];
+        let shareUrl = `${baseUrl}?result=${encodedData}`;
+        let shareText = `✨ [쿠리만주 쿠지 당첨 결과 공유] ✨\n내가 뽑은 결과야!\n👉 확인하기: ${shareUrl}`;
+
+        navigator.clipboard.writeText(shareText).then(() => {
+            let btn = document.getElementById('friend-share-btn');
+            btn.innerText = "✨ 결과+링크 복사 완료! 친구에게 보내보세요!";
+            btn.classList.add('success');
+            setTimeout(() => {
+                btn.innerText = "🎁 내 방금 뽑은 당첨 결과 & 링크 공유하기";
+                btn.classList.remove('success');
+            }, 2500);
+        }).catch(err => {
+            alert("링크 복사에 실패했습니다.");
+        });
+    }
+
+    function checkSharedResultParam() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let resultParam = urlParams.get('result');
+
+        if(resultParam) {
+            let decodedNames = decodeURIComponent(resultParam).split(',');
+            let sharedResults = [];
+
+            decodedNames.forEach(name => {
+                let found = prizes.find(p => p.name === name);
+                if(found) {
+                    sharedResults.push(found);
+                } else {
+                    sharedResults.push({ name: name, prob: '?', img: 'https://via.placeholder.com/150/d97706/ffffff?text=Prize' });
+                }
+            });
+
+            if(sharedResults.length > 0) {
+                lastResults = sharedResults;
+                let resultArea = document.getElementById('result-area');
+                let noticeArea = document.getElementById('shared-notice');
+                
+                noticeArea.style.display = 'block';
+                noticeArea.innerText = "💌 친구가 공유한 당첨 결과 화면입니다!";
+                resultArea.innerHTML = '';
+
+                sharedResults.forEach((prize) => {
+                    resultArea.innerHTML += `
+                        <div class="result-card">
+                            <img src="${prize.img || 'https://via.placeholder.com/150'}" class="result-img" alt="${prize.name}">
+                            <div style="font-weight: bold; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text);">${prize.name}</div>
+                            <div style="font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: bold;">(${prize.prob}%)</div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('action-buttons').style.display = 'flex';
+            }
+        }
+    }
+
+    function downloadResultImage() {
+        const captureArea = document.getElementById('capture-area');
+        html2canvas(captureArea, { backgroundColor: '#ffffff', scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'kuji_result.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    }
+
+    function copyResultText() {
+        if(lastResults.length === 0) return;
+        
+        let counts = {};
+        let probs = {};
+        lastResults.forEach(r => {
+            counts[r.name] = (counts[r.name] || 0) + 1;
+            probs[r.name] = r.prob;
+        });
+
+        let textSummary = "[🌰 쿠리만주 다라케 쿠지 결과 ✨]\n";
+        for(let name in counts) {
+            textSummary += `- ${name} (${probs[name]}%): ${counts[name]}개\n`;
+        }
+
+        navigator.clipboard.writeText(textSummary).then(() => {
+            let btn = document.getElementById('copy-text-btn');
+            btn.innerText = "📋 복사 완료!";
+            btn.classList.add('success');
+            setTimeout(() => {
+                btn.innerText = "📋 결과 텍스트 복사";
+                btn.classList.remove('success');
+            }, 2000);
+        });
+    }
+
+    function renderInventory() {
+        let inventoryArea = document.getElementById('inventory-area');
+        inventoryArea.innerHTML = '';
+
+        if (inventory.length === 0) {
+            inventoryArea.innerHTML = `<p style="color: var(--text-sub); font-size: 14px;">보관함이 비어 있습니다.</p>`;
+            return;
+        }
+
+        inventory.forEach((prize) => {
+            inventoryArea.innerHTML += `
+                <div class="result-card">
+                    <img src="${prize.img || 'https://via.placeholder.com/150'}" class="result-img" alt="${prize.name}">
+                    <div style="font-weight: bold; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text);">${prize.name}</div>
+                    <div style="font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: bold;">(${prize.prob}%)</div>
+                </div>
+            `;
+        });
+    }
+
+    function resetTotalDrawsAndInventory() {
+        if(confirm("총 추첨 횟수와 보관함 기록을 모두 초기화하시겠습니까?")) {
+            totalDraws = 0;
+            inventory = [];
+            lastResults = [];
+            
+            localStorage.removeItem('kuji_total_draws_v10');
+            localStorage.removeItem('kuji_inventory_v10');
+            
+            updateStatsDisplay();
+            renderInventory();
+            
+            document.getElementById('result-area').innerHTML = '<p style="color: var(--text-sub); font-size: 14px;">아직 뽑은 상품이 없습니다.</p>';
+            document.getElementById('shared-notice').style.display = 'none';
+            document.getElementById('action-buttons').style.display = 'none';
+            
+            alert("총 추첨 횟수와 보관함 기록이 초기화되었습니다!");
+        }
+    }
+
+    function resetSimulator() {
+        if(confirm("정말로 처음부터 다시 시작하시겠습니까? (총 추첨 횟수와 보관함 기록이 초기화됩니다)")) {
+            inventory = [];
+            totalDraws = 0;
+            localStorage.removeItem('kuji_inventory_v10');
+            localStorage.removeItem('kuji_total_draws_v10');
+            updateStatsDisplay();
+            
+            document.getElementById('result-area').innerHTML = '<p style="color: var(--text-sub); font-size: 14px;">아직 뽑은 상품이 없습니다.</p>';
+            document.getElementById('shared-notice').style.display = 'none';
+            document.getElementById('action-buttons').style.display = 'none';
+            renderInventory();
+            alert("초기화되었습니다!");
+        }
+    }
+</script>
+
+</body>
+</html>
